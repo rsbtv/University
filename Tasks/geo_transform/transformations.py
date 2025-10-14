@@ -9,7 +9,7 @@ def cartesian_to_spherical(x: float, y: float, z: float) -> tuple[float, float, 
     :return: tuple[float, float, float]
     """
     radius = sqrt(x**2 + y**2 + z**2)
-    azimuths_angle = 2 * atan2(x,y + sqrt(x**2 + y**2))
+    azimuths_angle = 2 * atan2(x, y + sqrt(x ** 2 + y ** 2))
     polar_angle = atan2(sqrt(x**2 + y**2), z)
     return radius, azimuths_angle, polar_angle
 
