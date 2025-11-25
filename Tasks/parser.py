@@ -1,57 +1,84 @@
-import urllib.request
 import re
+import requests
+from bs4 import BeautifulSoup
 import csv
-import base64
 
-url = 'https://msk.spravker.ru/avtoservisy-avtotehcentry/'
+URL = "https://msk.spravker.ru/avtoservisy-avtotehcentry/"
 
-headers = {'User-Agent': 'Mozilla/5.0'}
-req = urllib.request.Request(url, headers=headers)
-with urllib.request.urlopen(req) as response:
-    html = response.read().decode('utf-8')
+def get_html(url):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        )
+    }
+    resp = requests.get(url, headers=headers)
+    resp.encoding = "utf-8"
+    resp.raise_for_status()
+    return resp.text
 
-# Очищаем скобки вокруг классов для удобства поиска
-clean_html = re.sub(r'[\[\]\(\)]', '', html)
+def clean_html_tags(text):
+    # удаляем теги hmtl
+    return re.sub(r'<[^>]+>', '', text)
 
-# Находим все блоки автосервисов
-blocks = re.findall(r'<div class="org-widget">(.*?)</div>\s*</div>\s*</div>', clean_html, re.DOTALL)
+def regex_parse_block(block_html):
+    # название
+    name_match = re.search(
+        r'<a[^>]*class="\[?[\w\-]*org-widget-header__title-link[\w\-]*\]?"[^>]*>(.*?)</a>',
+        block_html, re.DOTALL | re.IGNORECASE
+    )
+    name = name_match.group(1).strip() if name_match else ""
 
-rows = []
+    # адрес
+    addr_match = re.search(
+        r'<span[^>]*class="\[?[\w\- ]*org-widget-header__meta--location[\w\- ]*\]?"[^>]*>(.*?)</span>',
+        block_html, re.DOTALL | re.IGNORECASE
+    )
+    address = addr_match.group(1).strip() if addr_match else ""
 
-for block in blocks:
-    # Название
-    name_match = re.search(r'class="org-widget-header__title-link">([^<]+)</a>', block)
-    name = name_match.group(1).strip() if name_match else ''
+    # телефон
+    phone_match = re.search(
+        r'<dt[^>]*>\s*<span[^>]*>\s*Телефон\s*</span>\s*</dt>\s*<dd[^>]*>(.*?)</dd>',
+        block_html, re.DOTALL | re.IGNORECASE
+    )
+    phone = phone_match.group(1).strip() if phone_match else ""
 
-    # Адрес
-    address_match = re.search(r'class="org-widget-header__meta org-widget-header__meta--location">([^<]+)</span>', block)
-    address = address_match.group(1).strip() if address_match else ''
+    #часы работы
+    hours_match = re.search(
+        r'<dt[^>]*>\s*<span[^>]*>\s*Часы\s*работы\s*</span>\s*</dt>\s*<dd[^>]*>(.*?)</dd>',
+        block_html, re.DOTALL | re.IGNORECASE
+    )
+    hours = hours_match.group(1).strip() if hours_match else ""
 
-    # Телефоны
-    phones_match = re.search(r'<dt class="spec__index"><span class="spec__index-inner">Телефон</span></dt>\s*<dd class="spec__value">([^<]+)</dd>', block)
-    phones = phones_match.group(1).strip() if phones_match else ''
+    name    = clean_html_tags(name)
+    address = clean_html_tags(address)
+    phone   = clean_html_tags(phone)
+    hours   = clean_html_tags(hours)
 
-    # Часы работы
-    hours_match = re.search(r'<dt class="spec__index"><span class="spec__index-inner">Часы работы</span></dt>\s*<dd class="spec__value">([^<]+)</dd>', block)
-    hours = hours_match.group(1).strip() if hours_match else ''
+    return {"Название": name, "Адрес": address, "Телефон": phone, "Часы работы": hours}
 
-    # Сайт (base64, из data-url)
-    site_match = re.search(r'<span class="js-pseudo-link" data-url="([^"]+)"></span>', block)
-    site_encoded = site_match.group(1).strip() if site_match else ''
-    site = ''
-    if site_encoded:
-        try:
-            site = base64.b64decode(site_encoded).decode('utf-8')
-        except Exception:
-            site = ''
+def parse_services(html):
+    soup = BeautifulSoup(html, "html.parser")
+    blocks = soup.find_all("div", class_="org-widget")
+    services = []
+    for block in blocks:
+        block_html = str(block)
+        service_data = regex_parse_block(block_html)
+        services.append(service_data)
+    return services
 
-    if name:
-        rows.append([name, address, phones, hours, site])
+def save_to_csv(services, filename="autocenters_regex.csv"):
+    with open(filename, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["Название", "Адрес", "Телефон", "Часы работы"], delimiter=";")
+        writer.writeheader()
+        writer.writerows(services)
 
-# Запись в CSV
-with open('avtoservisy.csv', 'w', encoding='utf-8', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['Название', 'Адрес', 'Телефоны', 'Часы работы', 'Сайт'])
-    writer.writerows(rows)
+def main():
+    html = get_html(URL)
+    services = parse_services(html)
+    for s in services:
+        print(s)
+    save_to_csv(services)
 
-print(f'Парсинг завершён, найдено записей: {len(rows)}')
+main()
