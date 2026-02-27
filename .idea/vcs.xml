@@ -2,6 +2,8 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Tasks/geometry" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/Tasks/neural_networks" vcs="" />
+    <mapping directory="$PROJECT_DIR$/Tasks/py_calculator_package" vcs="Git" />
   </component>
 </project>
