@@ -1,0 +1,10 @@
+[Unit]
+Description=chmod for ttyAP0
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/chmod 666 /dev/ttyAP0
+
+[Install]
+WantedBy=multi-user.target
